@@ -1,0 +1,84 @@
+os.loadAPI("Util")
+
+Data = {
+	title = "",
+	content = {},
+	items = {},
+	colors = {},
+	colonAlign = 0
+}
+
+currentLine = 1
+
+function Data:new(d, title, content, items, colors)
+	if not (Util.isNotNull("items", items)
+		and Util.isNotNull("colors", colors)
+		and Util.areOfType({"items", "colors"}, {items, colors}, "array"))
+	then
+		return nil
+	end
+	
+	d = d or {}
+	setmetatable(d, self)
+	self.__index = self
+	self.title = title
+	self.content = content or {}
+	self.items = items
+	self.colors = colors
+	self.colonAlign = Util.getMaxLengthInArray(items)
+	return d
+end
+
+function Data:setContent(content)
+	if Util.isOfType("content", content, "table") then
+		self.content = content
+	else
+		error("fail to set content: content is not a table")
+	end
+end
+
+function Data:getContent(key)
+	if key == nil then
+		return self.content
+	elseif Util.isOfType("key", key, "string") then
+		local content = self.content[key]
+		if content == nil then
+			error("Key \""..key.."\" is not present in content")
+		end
+		return content
+	end
+end
+
+function Data:output(monitor)
+	currentLine = 1
+	Data:printLine(monitor, colors.white, self.title, true)
+	Data:printBlankLine(monitor)
+	
+	for i = 1, #self.items do
+		local color = self.colors[i]
+		local name = self.items[i]
+		local align = self.colonAlign
+		local lineContent = name..string.rep(" ", align - #name + 1)..": "..self.content[name]
+		Data:printLine(monitor, self.colors[i], lineContent)
+		i = i + 1
+	end
+end
+
+function Data:printLine(monitor, color, content, alignCentre)
+	if alignCentre then
+		local w, h = monitor.getSize()
+		monitor.setCursorPos(math.floor(w / 2) - math.floor(#content / 2), currentLine)
+	else
+		monitor.setCursorPos(1, currentLine)
+	end
+	monitor.clearLine()
+	monitor.setTextColor(color)
+	monitor.write(content)
+	currentLine = currentLine + 1
+end
+
+function Data:printBlankLine(monitor)
+	monitor.setCursorPos(1, currentLine)
+	monitor.clearLine()
+	currentLine = currentLine + 1
+end

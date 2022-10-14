@@ -1,0 +1,156 @@
+local typeString = {
+	"nil",
+	"number",
+	"string",
+	"boolean",
+	"array",
+	"table",
+	"function",
+	"thread",
+	"userdata" 
+}
+
+function isArray(tbl)
+	return type(tbl) == "table" and tbl[1] ~= nil
+end
+
+function contains(arr, val)
+	if not isArray(arr) then
+		return false
+	end
+	for _, v in pairs(arr) do
+		if v == val then
+			return true
+		end
+	end
+	return false
+end
+
+function getMaxLengthInArray(arr)
+	local length = 0
+	for i = 1, #arr do
+		if #arr[i] > length then
+			length = #arr[i]
+		end
+	end
+	return length
+end
+
+function round(number, decimals)
+    local power = 10 ^ decimals
+    return math.floor(number * power) / power
+end
+
+function toBoolean(str)
+	return str == "true"
+end
+
+function isOfType(varname, val, t)
+	if type(t) ~= "string" then
+		print("Type supplied for \""..varname.."\" must be in string format, e.g. \"number\"")
+		return false
+	end
+	if not contains(typeString, t) then
+		print("Invalid type \""..t.."\" supported")
+		return false
+	end
+	if (t ~= "array" and type(val) ~= t) or (t == "array" and not isArray(val)) then
+		print("\""..varname.."\" must be of type \""..t.."\", found: \""..type(val).."\"")
+		return false
+	end
+	return true
+end
+
+function areOfType(varnames, arr, t)
+	if not isOfType("arr", arr, "array") or not isOfType("varnames", varnames, "array") then
+		print("at least one of the args supplied is not an array")
+		return false
+	end
+	if #varnames ~= #arr then
+		print("length of varnames must be equal to that of arr")
+		return false
+	end
+	
+	for i = 1, #arr do
+		if not isOfType(varnames[i], arr[i], t) then
+			return false
+		end
+	end
+	return true
+end
+
+function isNotNull(varname, val)
+	if val == nil or val == {} or val == "" then
+		print("\""..varname.."\" is empty")
+		return false
+	end
+	return true
+end
+
+function areNotNull(varnames, arr)
+	if not (isOfType("varnames", varnames, "array") and isOfType("arr", arr, "array")) then
+		print("at least one of the args supplied is not an array")
+		return false
+	end
+	if #varnames ~= #arr then
+		print("length of varnames must be equal to that of arr")
+		return false
+	end
+	
+	for i = 1, #varnames do
+		if not isNotNull(varnames[i], arr[i]) then
+			return false
+		end
+	end
+end
+
+function conditionChecks(arr, cond)
+	if not isOfType("arr", arr, "array") then
+		error("arg supplied is not an array")
+	end
+	if not isOfType("cond", cond, "function") or not isOfType("cond(x)", cond(arr[1]), "boolean") then
+		error("condition must be a boolean function")
+		return false
+	end
+	for _, v in pairs(arr) do
+		if not cond(v) then
+			return false
+		end
+	end
+	return true
+end
+
+function isEmptyString(varname, str)
+	if not isOfType(varname, str, "string") then
+		return -1
+	elseif isNotNull(varname, str) then
+		return 0
+	else 
+		return 1
+	end
+end
+
+function waitForConnection(identifier)
+	local retry = 0
+	while true do
+		if (retry >= 10) then
+			error("Cannot find "..identifier.." after 10 tries")
+			return
+		end
+		p = peripheral.find(identifier)
+		if (p ~= nil) then
+			return p
+		end
+		retry = retry + 1
+		sleep(1)
+	end
+end
+
+function getPosition()
+	local position = vector.new(gps.locate(5))
+	if not position then
+		error("Cannot find locate device")
+		return nil
+	end
+	return tostring(position)
+end

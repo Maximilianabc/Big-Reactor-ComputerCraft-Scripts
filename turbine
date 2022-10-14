@@ -1,0 +1,78 @@
+os.loadAPI("Util")
+os.loadAPI("Data")
+os.loadAPI("Button")
+
+local position = Util.getPosition()
+local mon = Util.waitForConnection("monitor")
+local turbine = Util.waitForConnection("BigReactors-Turbine")
+local dataItems = {
+	"Speed",
+	"Production",
+	"Steam",
+	"Water",
+	"Consumption",
+	"Engaged"
+}
+local dataColors = {
+	colors.pink,
+	colors.lime,
+	colors.lightGray,
+	colors.lightBlue,
+	colors.orange,
+	colors.magenta
+}
+
+local data = Data.Data:new(nil, "Big Reactor Turbine "..position, {}, dataItems, dataColors)
+local function toggleEngage()
+	turbine.setInductorEngaged(not Util.toBoolean(data.content["Engaged"]))
+end
+
+local engageButton = Button.Button:new(nil, "Engage", "Toggle Engage", toggleEngage)
+engageButton:setPosition(1, #dataItems + 4, 10, 3)
+engageButton:setColor(colors.black, colors.white)
+
+local buttons = { engageButton }
+
+local function updateAsync()
+	while true do
+		data:setContent({
+			["Speed"] = string.format("%f %s", Util.round(turbine.getRotorSpeed(), 2), "RPM"),
+			["Production"] = string.format("%f %s", Util.round(turbine.getEnergyProducedLastTick(), 2), "RF/t"),
+			["Steam"] = string.format("%d %s", turbine.getInputAmount(), "mB"),
+			["Water"] = string.format("%d %s", turbine.getOutputAmount(), "mB"),
+			["Consumption"] = string.format("%d %s", turbine.getFluidFlowRate(), "mB/t"),
+			["Engaged"] = tostring(turbine.getInductorEngaged())
+		})
+		data:output(mon)
+		sleep(0.25)
+	end
+end
+
+local function touchAsync()
+	while true do
+		local event, peripheral_name, c, r = os.pullEvent("monitor_touch")
+		local clicked = Button.getClicked(buttons, c, r)
+		if (clicked ~= nil) then
+			clicked:onClick()
+		end
+		sleep(0.25)
+	end
+end
+
+local function keyboardAsync()
+	while true do
+		local event, key = os.pullEvent("key_up")
+		if key == keys.x then
+			return
+		end
+	end
+end
+
+mon.clear()
+for _, b in pairs(buttons) do 
+	b:display(mon)
+end
+
+print("Press X to terminate...")
+parallel.waitForAny(updateAsync, touchAsync, keyboardAsync)
+print ("Terminated!")

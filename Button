@@ -1,0 +1,103 @@
+os.loadAPI("Util")
+
+Button = {
+	name = "",
+	column = 0,
+	row = 0,
+	width = 0,
+	height = 0,
+	text = "",
+	foreColor = colors.black,
+	backColor = colors.black,
+	action = nil,
+	click = false
+}
+
+function Button:new(b, name, text, action)
+	if Util.isEmptyString("name", name) ~= 0 
+		or Util.isEmptyString("text", text) ~= 0
+		or not Util.isOfType("action", action, "function")
+		or not Util.isNotNull("action", action)
+	then
+		return nil
+	end
+	
+	b = b or {}
+	setmetatable(b, self)
+	self.__index = self
+	self.name = name
+	self.text = text
+	self.action = action
+	self.click = false
+	return b
+end
+
+function Button:setPosition(column, row, width, height)
+	local largerThanZero = function(x) return x > 0 end
+	if not (Util.areOfType({"column", "row", "width", "height"}, {column, row, width, height}, "number")
+		and Util.conditionChecks({column, row, width, height}, largerThanZero))
+	then
+		error("fail to set position: at least one of the attributes (column, row, width, height) is not a number or is less than 1")
+		return
+	end
+	if height % 2 == 0 or height <= 0 then
+		print(string.format("fail to set position: height of button %s is not an odd number > 0", self.name))
+	end
+	
+	self.column = column
+	self.row = row
+	self.height = height
+	if #self.text > width then
+		self.width = #self.text
+	else
+		self.width = width
+	end
+end
+
+function Button:setColor(fore, back)
+	if not Util.areOfType({"fore", "back"}, {fore, back}, "number") then
+		error("fail to set color: at least one of the attributes (fore, back) is not a number")
+		return
+	end
+	
+	self.foreColor = fore
+	self.backColor = back
+end
+
+function Button:display(monitor)
+	for i = 0, self.height - 1 do
+		monitor.setCursorPos(self.column, self.row + i)
+		monitor.setBackgroundColor(self.backColor)
+		monitor.setTextColor(self.foreColor)
+		if i ~= math.floor(self.height / 2) then
+			monitor.write(string.rep(" ", self.width))
+		else
+			local pad = math.floor((self.width - #self.text) / 2);
+			monitor.write(string.rep(" ", pad)..self.text..string.rep(" ", pad))
+		end
+	end
+	monitor.setBackgroundColor(colors.black)
+end
+
+function Button:onClick()
+	self.action()
+end
+
+function getClicked(buttons, c, r)
+	if not Util.isOfType("buttons", buttons, "array") then
+		error("fail to get clicked button: buttons is not an array")
+		return nil
+	end
+	for _, b in pairs(buttons) do
+		if getmetatable(b) ~= Button then
+			error("fail to get clicked button: there is a non-button element in buttons")
+			return nil
+		end
+		local col = b.column
+		local row = b.row
+		if c >= col and r >= row and c <= col + b.width and r <= row + b.height then
+			return b
+		end
+	end
+	return nil
+end

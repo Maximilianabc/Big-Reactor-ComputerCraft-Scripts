@@ -162,10 +162,19 @@ function locate( _nTimeout, _bDebug )
 end
 
 function getPosition()
-	local position = vector.new(gps.locate(5))
-	if not position then
-		error("Cannot find locate device")
-		return nil
+	local retry = 0
+	while true do
+		if retry > 10 then
+			error("Cannot locate device")
+			return nil
+		end
+		
+		local x, y, z = gps.locate(5)
+		if not x then
+			retry = retry + 1
+			sleep(0.5)
+		else
+			return tostring(vector.new(x, y, z))
+		end
 	end
-	return tostring(position)
 end

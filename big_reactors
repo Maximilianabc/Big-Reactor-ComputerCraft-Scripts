@@ -1,4 +1,4 @@
-local mon, turbine
+local mon, turbine, position, turbine_data
 
 local dataItems = {
 	"Speed",
@@ -17,7 +17,6 @@ local dataColors = {
 	colors.magenta
 }
 
-local turbine_data = data.Data:new(nil, "Big Reactor Turbine "..gps.getPosition(), {}, dataItems, dataColors)
 local function toggleEngage()
 	turbine.setInductorEngaged(not utils.toBoolean(turbine_data.content["Engaged"]))
 end
@@ -64,10 +63,12 @@ local function keyboardAsync()
 end
 
 function startTurbine()
+	position = gps.getPosition()
 	mon = peripheral.waitForConnection("monitor")
-	mon.clear()
 	turbine = peripheral.waitForConnection("BigReactors-Turbine") 
+	turbine_data = data.Data:new(nil, "BR Turbine "..position, {}, dataItems, dataColors)
 	
+	mon.clear()
 	for _, b in pairs(turbine_buttons) do 
 		b:display(mon)
 	end

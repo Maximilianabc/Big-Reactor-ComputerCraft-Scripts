@@ -1,5 +1,3 @@
-os.loadAPI("Util")
-
 Data = {
 	title = "",
 	content = {},
@@ -11,9 +9,9 @@ Data = {
 currentLine = 1
 
 function Data:new(d, title, content, items, colors)
-	if not (Util.isNotNull("items", items)
-		and Util.isNotNull("colors", colors)
-		and Util.areOfType({"items", "colors"}, {items, colors}, "array"))
+	if not (utils.isNotNull("items", items)
+		and utils.isNotNull("colors", colors)
+		and utils.areOfType({"items", "colors"}, {items, colors}, "array"))
 	then
 		return nil
 	end
@@ -25,12 +23,12 @@ function Data:new(d, title, content, items, colors)
 	self.content = content or {}
 	self.items = items
 	self.colors = colors
-	self.colonAlign = Util.getMaxLengthInArray(items)
+	self.colonAlign = utils.getMaxLengthInArray(items)
 	return d
 end
 
 function Data:setContent(content)
-	if Util.isOfType("content", content, "table") then
+	if utils.isOfType("content", content, "table") then
 		self.content = content
 	else
 		error("fail to set content: content is not a table")
@@ -40,7 +38,7 @@ end
 function Data:getContent(key)
 	if key == nil then
 		return self.content
-	elseif Util.isOfType("key", key, "string") then
+	elseif utils.isOfType("key", key, "string") then
 		local content = self.content[key]
 		if content == nil then
 			error("Key \""..key.."\" is not present in content")

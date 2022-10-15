@@ -1,5 +1,3 @@
-os.loadAPI("Util")
-
 Button = {
 	name = "",
 	column = 0,
@@ -14,10 +12,10 @@ Button = {
 }
 
 function Button:new(b, name, text, action)
-	if Util.isEmptyString("name", name) ~= 0 
-		or Util.isEmptyString("text", text) ~= 0
-		or not Util.isOfType("action", action, "function")
-		or not Util.isNotNull("action", action)
+	if utils.isEmptyString("name", name) ~= 0 
+		or utils.isEmptyString("text", text) ~= 0
+		or not utils.isOfType("action", action, "function")
+		or not utils.isNotNull("action", action)
 	then
 		return nil
 	end
@@ -34,8 +32,8 @@ end
 
 function Button:setPosition(column, row, width, height)
 	local largerThanZero = function(x) return x > 0 end
-	if not (Util.areOfType({"column", "row", "width", "height"}, {column, row, width, height}, "number")
-		and Util.conditionChecks({column, row, width, height}, largerThanZero))
+	if not (utils.areOfType({"column", "row", "width", "height"}, {column, row, width, height}, "number")
+		and utils.conditionChecks({column, row, width, height}, largerThanZero))
 	then
 		error("fail to set position: at least one of the attributes (column, row, width, height) is not a number or is less than 1")
 		return
@@ -55,7 +53,7 @@ function Button:setPosition(column, row, width, height)
 end
 
 function Button:setColor(fore, back)
-	if not Util.areOfType({"fore", "back"}, {fore, back}, "number") then
+	if not utils.areOfType({"fore", "back"}, {fore, back}, "number") then
 		error("fail to set color: at least one of the attributes (fore, back) is not a number")
 		return
 	end
@@ -84,7 +82,7 @@ function Button:onClick()
 end
 
 function getClicked(buttons, c, r)
-	if not Util.isOfType("buttons", buttons, "array") then
+	if not utils.isOfType("buttons", buttons, "array") then
 		error("fail to get clicked button: buttons is not an array")
 		return nil
 	end
@@ -100,4 +98,59 @@ function getClicked(buttons, c, r)
 		end
 	end
 	return nil
+end
+
+SpinButton = {
+	value = 0
+}
+
+function SpinButton:new(sb, name, text, action, value)
+	if not utils.isOfType("value", value, "number") then
+		error("Value of a spin button must be a number (found: "..type(value)..")")
+		return nil
+	end
+	
+	setmetatable(SpinButton, {__index = Button})
+	sb = sb or Button:new(sb, name, text, action)
+	setmetatable(sb, self)
+	self.__index = self
+	
+	self.value = value
+	
+	return sb
+end
+
+
+function SpinButton:onClick()
+	self.action(self.value)
+end
+
+FlowControlButton = {
+	direction = "",
+	signal = ""
+}
+
+function FlowControlButton:new(fb, name, text, action, value, direction, signal)
+	if (direction ~= "in" and direction ~= "out") then
+		error("\"direction\" of a flow control button must be \"in\" or \"out\"")
+		return nil
+	end
+	if (signal ~= "high" and signal ~= "low") then
+		error("\"signal\" of a flow control button must be \"high\" or \"low\"")
+		return nil
+	end
+	
+	setmetatable(FlowControlButton, {__index = SpinButton})
+	fb = fb or SpinButton:new(fb, name, text, action, value)
+	setmetatable(fb, self)
+	self.__index = self
+	
+	self.direction = direction
+	self.signal = signal
+	
+	return fb
+end
+
+function FlowControlButton:onClick()
+	self.action(value, direction, signal)
 end

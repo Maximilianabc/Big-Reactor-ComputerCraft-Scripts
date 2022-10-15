@@ -1,10 +1,5 @@
-os.loadAPI("Util")
-os.loadAPI("Data")
-os.loadAPI("Button")
+local mon, turbine
 
-local position = Util.getPosition()
-local mon = Util.waitForConnection("monitor")
-local turbine = Util.waitForConnection("BigReactors-Turbine")
 local dataItems = {
 	"Speed",
 	"Production",
@@ -22,28 +17,28 @@ local dataColors = {
 	colors.magenta
 }
 
-local data = Data.Data:new(nil, "Big Reactor Turbine "..position, {}, dataItems, dataColors)
+local turbine_data = data.Data:new(nil, "Big Reactor Turbine "..gps.getPosition(), {}, dataItems, dataColors)
 local function toggleEngage()
-	turbine.setInductorEngaged(not Util.toBoolean(data.content["Engaged"]))
+	turbine.setInductorEngaged(not utils.toBoolean(turbine_data.content["Engaged"]))
 end
 
-local engageButton = Button.Button:new(nil, "Engage", "Toggle Engage", toggleEngage)
+local engageButton = buttons.Button:new(nil, "Engage", "Toggle Engage", toggleEngage)
 engageButton:setPosition(1, #dataItems + 4, 10, 3)
 engageButton:setColor(colors.black, colors.white)
 
-local buttons = { engageButton }
+local turbine_buttons = { engageButton }
 
 local function updateAsync()
 	while true do
-		data:setContent({
-			["Speed"] = string.format("%f %s", Util.round(turbine.getRotorSpeed(), 2), "RPM"),
-			["Production"] = string.format("%f %s", Util.round(turbine.getEnergyProducedLastTick(), 2), "RF/t"),
+		turbine_data:setContent({
+			["Speed"] = string.format("%f %s", utils.round(turbine.getRotorSpeed(), 2), "RPM"),
+			["Production"] = string.format("%f %s", utils.round(turbine.getEnergyProducedLastTick(), 2), "RF/t"),
 			["Steam"] = string.format("%d %s", turbine.getInputAmount(), "mB"),
 			["Water"] = string.format("%d %s", turbine.getOutputAmount(), "mB"),
 			["Consumption"] = string.format("%d %s", turbine.getFluidFlowRate(), "mB/t"),
 			["Engaged"] = tostring(turbine.getInductorEngaged())
 		})
-		data:output(mon)
+		turbine_data:output(mon)
 		sleep(0.25)
 	end
 end
@@ -51,7 +46,7 @@ end
 local function touchAsync()
 	while true do
 		local event, peripheral_name, c, r = os.pullEvent("monitor_touch")
-		local clicked = Button.getClicked(buttons, c, r)
+		local clicked = buttons.getClicked(turbine_buttons, c, r)
 		if (clicked ~= nil) then
 			clicked:onClick()
 		end
@@ -68,11 +63,16 @@ local function keyboardAsync()
 	end
 end
 
-mon.clear()
-for _, b in pairs(buttons) do 
-	b:display(mon)
-end
+function startTurbine()
+	mon = peripheral.waitForConnection("monitor")
+	mon.clear()
+	turbine = peripheral.waitForConnection("BigReactors-Turbine") 
+	
+	for _, b in pairs(turbine_buttons) do 
+		b:display(mon)
+	end
 
-print("Press X to terminate...")
-parallel.waitForAny(updateAsync, touchAsync, keyboardAsync)
-print ("Terminated!")
+	print("Press X to terminate...")
+	parallel.waitForAny(updateAsync, touchAsync, keyboardAsync)
+	print ("Terminated!")
+end

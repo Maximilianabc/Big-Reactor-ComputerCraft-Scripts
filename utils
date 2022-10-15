@@ -129,28 +129,3 @@ function isEmptyString(varname, str)
 		return 1
 	end
 end
-
-function waitForConnection(identifier)
-	local retry = 0
-	while true do
-		if (retry >= 10) then
-			error("Cannot find "..identifier.." after 10 tries")
-			return
-		end
-		p = peripheral.find(identifier)
-		if (p ~= nil) then
-			return p
-		end
-		retry = retry + 1
-		sleep(1)
-	end
-end
-
-function getPosition()
-	local position = vector.new(gps.locate(5))
-	if not position then
-		error("Cannot find locate device")
-		return nil
-	end
-	return tostring(position)
-end

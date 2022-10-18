@@ -117,14 +117,14 @@ function find( sType, fnFilter )
 	return table.unpack( tResults )
 end
 
-function waitForConnection(identifier)
+function waitForConnection(identifier, fnFilter)
 	local retry = 0
 	while true do
 		if (retry >= 10) then
 			print("Cannot find "..identifier.." after 10 tries")
 			return
 		end
-		p = peripheral.find(identifier)
+		p = peripheral.find(identifier, fnFilter)
 		if (p ~= nil) then
 			return p
 		end

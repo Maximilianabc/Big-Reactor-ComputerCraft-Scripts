@@ -1,0 +1,81 @@
+local position, turbine, modem
+local turbine_arr = {}
+local server_id = -1
+local connected_client_id = -1
+
+local function handleConnectionRequest(client_id)
+	if connected_client_id < 0 then 
+		--no current connections, establish one
+		connected_client_id = client_id
+		rednet.send(client_id, true, big_reactors.CONNECTION_PROTOCOL)
+		rednet.send(client_id, { ["position"] = position }, big_reactors.MESSAGE_PROTOCOL)
+		print("Client ("..connected_client_id..") connected.") 
+	else
+		--has existing, reject
+		rednet.send(client_id, false, big_reactors.CONNECTION_PROTOCOL)
+		print("Rejected connection request from client ("..client_id.."). Reason: a connection with another client already exists.")
+	end	
+end
+
+local function toggleEngage()
+	turbine.setInductorEngaged(not turbine.getInductorEngaged())
+end
+
+local function updateAsync()
+	while true do
+		if connected_client_id >= 0 then
+			turbine_arr = {
+				string.format("%f %s", utils.round(turbine.getRotorSpeed(), 2), "RPM"), --Speed
+				string.format("%f %s", utils.round(turbine.getEnergyProducedLastTick(), 2), "RF/t"), --Production
+				string.format("%d %s", turbine.getInputAmount(), "mB"),  --Steam
+				string.format("%d %s", turbine.getOutputAmount(), "mB"), --Water
+				string.format("%d %s", turbine.getFluidFlowRate(), "mB/t"), --Consumption
+				tostring(turbine.getInductorEngaged()) --Engaged
+			}
+			
+			rednet.send(connected_client_id, turbine_arr, big_reactors.DATA_PROTOCOL)
+		end
+		sleep(0.25)
+	end
+end
+
+local function receiveMessageAsync()
+	local sender, message, protocol
+	while true do
+		print("Awaiting messages...")
+		sender, message, protocol = rednet.receive()
+		if message ~= nil then
+			if message == big_reactors.CONNECTION_REQUEST and protocol == big_reactors.CONNECTION_PROTOCOL then
+				print("Connection request received")
+				handleConnectionRequest(sender)
+			elseif protocol == big_reactors.MESSAGE_PROTOCOL then
+				if message == big_reactors.TOGGLE_ENGAGE_MESSAGE then
+					toggleEngage()
+				end
+			end
+		end
+	end
+end
+
+local function broadcastAsync()
+	while connected_client_id < 0 do
+		rednet.broadcast(position, big_reactors.BROADCAST_PROTOCOL)
+		sleep(1)
+	end
+end	
+
+function start()
+	server_id = os.getComputerID()
+	position = gps.getPosition()
+	turbine = peripheral.waitForConnection("BigReactors-Turbine")
+	modem = peripheral.waitForConnection("modem", function(name, object) return object.isWireless() end)
+	modem.open(1)
+	rednet.open(big_reactors.WIRELESS_MODEM_SIDE)
+	
+	rednet.host(position, big_reactors.CONNECTION_PROTOCOL)
+	rednet.host(position, big_reactors.MESSAGE_PROTOCOL)
+	rednet.host(position, big_reactors.DATA_PROTOCOL)
+	rednet.host(position, big_reactors.BROADCAST_PROTOCOL)
+	
+	parallel.waitForAll(updateAsync, receiveMessageAsync, broadcastAsync)
+end

@@ -17,7 +17,7 @@ function Data:new(d, title, content, items, colors)
 	end
 	
 	d = d or {}
-	setmetatable(d, self)
+	setmetatable(d, Data)
 	self.__index = self
 	self.title = title
 	self.content = content or {}

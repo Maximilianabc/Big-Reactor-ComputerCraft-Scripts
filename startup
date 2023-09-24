@@ -1,5 +1,11 @@
 --Uncomment the following line if the computer is server
---big_reactors_server.start()
+--[[
+server = brturbine.Server:new()
+server:start()
+]]--
 
 --Uncomment the following line if the computer is client
---big_reactors_client.start()
+--[[
+client = brturbine.Client:new()
+client:start()
+]]--

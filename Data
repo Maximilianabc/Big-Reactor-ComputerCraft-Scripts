@@ -13,6 +13,7 @@ function Data:new(d, title, content, items, colors)
 		and utils.isNotNull("colors", colors)
 		and utils.areOfType({"items", "colors"}, {items, colors}, "array"))
 	then
+		error("fail to create new data: items or colors is null, or they are not an array")
 		return nil
 	end
 	

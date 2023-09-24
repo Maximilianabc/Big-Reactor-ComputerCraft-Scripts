@@ -1,0 +1,122 @@
+TOGGLE_ENGAGE_MESSAGE = "toggleEngage"
+
+-- Turbine Client Class
+
+Client = {
+	turbineData = {}
+}
+
+function Client:new()
+
+	local dataItems = {
+		"Speed",
+		"Production",
+		"Steam",
+		"Water",
+		"Consumption",
+		"Engaged"
+	}
+		
+	local dataColors = {
+		colors.pink,
+		colors.lime,
+		colors.lightGray,
+		colors.lightBlue,
+		colors.orange,
+		colors.magenta
+	}
+	
+	self.__index = self
+	setmetatable(Client, { __index = br.Client })
+	
+	client = br.Client:new()
+	setmetatable(client, Client)
+	
+	local data_handler = function(data) client:handleData(data) end
+	local msg_handler = function(msg) client:handleMessage(msg) end
+	
+	local engageButton = buttons.Base:new("Engage", "Toggle Engage", function() client:sendToggleEngageMessage() end)
+	engageButton:setPosition(1, #dataItems + 4, 10, 3)
+	engageButton:setColor(colors.black, colors.white)	
+	
+	function client:sendToggleEngageMessage()
+		rednet.send(client.connectedServerID, TOGGLE_ENGAGE_MESSAGE, br.MESSAGE_PROTOCOL)
+	end
+	
+	function client:handleData(data)
+		client.turbineData:setContent({
+			["Speed"] = data[1],
+			["Production"] = data[2],
+			["Steam"] = data[3],
+			["Water"] = data[4],
+			["Consumption"] = data[5],
+			["Engaged"] = data[6]
+		})
+		client.turbineData:output(client.monitor)
+	end		
+	function client:handleMessage(msg)
+		if msg["position"] ~= nil then
+			print("Server position received")
+			client.turbineData.title = "BR Turbine "..msg["position"]
+		end
+	end
+	
+	function client:start()
+		client.turbineData = data.Data:new(nil, "BR Turbine", {}, dataItems, dataColors)
+		client:startClient()
+	end
+	
+	client:setDataHandler(data_handler)
+	client:setMessageHandler(msg_handler)
+	client:setButtons({ engageButton })
+	
+	return client
+	
+end
+
+-- Turbine Server Class
+
+Server = {
+	turbine = nil
+}
+
+function Server:new()
+	
+	self.__index = self
+	setmetatable(Server, { __index = br.Server })
+
+	local server = br.Server:new()
+	setmetatable(server, Server)
+	
+	local data_fetcher = function() return server:getData() end
+	local msg_handlers = {
+		[TOGGLE_ENGAGE_MESSAGE] = function() server:toggleEngage() end
+	}	
+	
+	function server:getData()
+		return {
+			string.format("%f %s", utils.round(server.turbine.getRotorSpeed(), 2), "RPM"), --Speed
+			string.format("%f %s", utils.round(server.turbine.getEnergyProducedLastTick(), 2), "RF/t"), --Production
+			string.format("%d %s", server.turbine.getInputAmount(), "mB"),  --Steam
+			string.format("%d %s", server.turbine.getOutputAmount(), "mB"), --Water
+			string.format("%d %s", server.turbine.getFluidFlowRate(), "mB/t"), --Consumption
+			tostring(server.turbine.getInductorEngaged()) --Engaged
+		}
+	end
+	
+	function server:toggleEngage()
+		server.turbine.setInductorEngaged(not server.turbine.getInductorEngaged())
+	end
+	
+	function server:start()
+		print("Starting turbine server...")
+		server.turbine = peripheral.waitForConnection("BigReactors-Turbine")
+		server:startServer()
+	end
+	
+	server:setDataFetcher(data_fetcher)
+	server:setMessageHandlers(msg_handlers)
+	
+	return server
+	
+end

@@ -1,4 +1,4 @@
-Button = {
+Base = {
 	name = "",
 	column = 0,
 	row = 0,
@@ -11,7 +11,8 @@ Button = {
 	click = false
 }
 
-function Button:new(b, name, text, action)
+function Base:new(name, text, action)
+
 	if utils.isEmptyString("name", name) ~= 0 
 		or utils.isEmptyString("text", text) ~= 0
 		or not utils.isOfType("action", action, "function")
@@ -20,65 +21,68 @@ function Button:new(b, name, text, action)
 		return nil
 	end
 	
-	b = b or {}
-	setmetatable(b, self)
 	self.__index = self
-	self.name = name
-	self.text = text
-	self.action = action
-	self.click = false
-	return b
-end
-
-function Button:setPosition(column, row, width, height)
-	local largerThanZero = function(x) return x > 0 end
-	if not (utils.areOfType({"column", "row", "width", "height"}, {column, row, width, height}, "number")
-		and utils.conditionChecks({column, row, width, height}, largerThanZero))
-	then
-		error("fail to set position: at least one of the attributes (column, row, width, height) is not a number or is less than 1")
-		return
-	end
-	if height % 2 == 0 or height <= 0 then
-		print(string.format("fail to set position: height of button %s is not an odd number > 0", self.name))
-	end
 	
-	self.column = column
-	self.row = row
-	self.height = height
-	if #self.text > width then
-		self.width = #self.text
-	else
-		self.width = width
-	end
-end
+	local base = {}
+	setmetatable(base, Base)
 
-function Button:setColor(fore, back)
-	if not utils.areOfType({"fore", "back"}, {fore, back}, "number") then
-		error("fail to set color: at least one of the attributes (fore, back) is not a number")
-		return
-	end
-	
-	self.foreColor = fore
-	self.backColor = back
-end
-
-function Button:display(monitor)
-	for i = 0, self.height - 1 do
-		monitor.setCursorPos(self.column, self.row + i)
-		monitor.setBackgroundColor(self.backColor)
-		monitor.setTextColor(self.foreColor)
-		if i ~= math.floor(self.height / 2) then
-			monitor.write(string.rep(" ", self.width))
-		else
-			local pad = math.floor((self.width - #self.text) / 2);
-			monitor.write(string.rep(" ", pad)..self.text..string.rep(" ", pad))
+	function base:setPosition(column, row, width, height)
+		local largerThanZero = function(x) return x > 0 end
+		if not (utils.areOfType({"column", "row", "width", "height"}, {column, row, width, height}, "number")
+			and utils.conditionChecks({column, row, width, height}, largerThanZero))
+		then
+			error("fail to set position: at least one of the attributes (column, row, width, height) is not a number or is less than 1")
+			return
 		end
+		if height % 2 == 0 or height <= 0 then
+			print(string.format("fail to set position: height of button %s is not an odd number > 0", base.name))
+		end
+		
+		base.column = column
+		base.row = row
+		base.height = height
+		if #base.text > width then
+			base.width = #base.text
+		else
+			base.width = width
+		end
+	end	
+	function base:setColor(fore, back)
+		if not utils.areOfType({"fore", "back"}, {fore, back}, "number") then
+			error("fail to set color: at least one of the attributes (fore, back) is not a number")
+			return
+		end
+		
+		base.foreColor = fore
+		base.backColor = back
 	end
-	monitor.setBackgroundColor(colors.black)
-end
+	
+	function base:display(monitor)
+		for i = 0, base.height - 1 do
+			monitor.setCursorPos(base.column, base.row + i)
+			monitor.setBackgroundColor(base.backColor)
+			monitor.setTextColor(base.foreColor)
+			if i ~= math.floor(base.height / 2) then
+				monitor.write(string.rep(" ", base.width))
+			else
+				local pad = math.floor((base.width - #base.text) / 2);
+				monitor.write(string.rep(" ", pad)..base.text..string.rep(" ", pad))
+			end
+		end
+		monitor.setBackgroundColor(colors.black)
+	end
 
-function Button:onClick()
-	self.action()
+	function base:onClick()
+		base.action()
+	end
+		
+	base.name = name
+	base.text = text
+	base.action = action
+	base.click = false
+	
+	return base
+	
 end
 
 function getClicked(buttons, c, r)
@@ -87,7 +91,7 @@ function getClicked(buttons, c, r)
 		return nil
 	end
 	for _, b in pairs(buttons) do
-		if getmetatable(b) ~= Button then
+		if getmetatable(b) ~= Base then
 			error("fail to get clicked button: there is a non-button element in buttons")
 			return nil
 		end
@@ -104,25 +108,27 @@ SpinButton = {
 	value = 0
 }
 
-function SpinButton:new(sb, name, text, action, value)
+function SpinButton:new(name, text, action, value)
+
 	if not utils.isOfType("value", value, "number") then
 		error("Value of a spin button must be a number (found: "..type(value)..")")
 		return nil
 	end
 	
-	setmetatable(SpinButton, {__index = Button})
-	sb = sb or Button:new(sb, name, text, action)
-	setmetatable(sb, self)
 	self.__index = self
+	setmetatable(SpinButton, {__index = Base})
 	
-	self.value = value
+	local spin = Base:new(name, text, action)	
+	setmetatable(spin, SpinButton)
 	
-	return sb
-end
-
-
-function SpinButton:onClick()
-	self.action(self.value)
+	function spin:onClick()
+		spin.action(spin.value)
+	end
+	
+	spin.value = value
+	
+	return spin
+	
 end
 
 FlowControlButton = {
@@ -130,7 +136,8 @@ FlowControlButton = {
 	signal = ""
 }
 
-function FlowControlButton:new(fb, name, text, action, value, direction, signal)
+function FlowControlButton:new(name, text, action, value, direction, signal)
+
 	if (direction ~= "in" and direction ~= "out") then
 		error("\"direction\" of a flow control button must be \"in\" or \"out\"")
 		return nil
@@ -140,17 +147,19 @@ function FlowControlButton:new(fb, name, text, action, value, direction, signal)
 		return nil
 	end
 	
-	setmetatable(FlowControlButton, {__index = SpinButton})
-	fb = fb or SpinButton:new(fb, name, text, action, value)
-	setmetatable(fb, self)
 	self.__index = self
+	setmetatable(FlowControlButton, {__index = SpinButton})
 	
-	self.direction = direction
-	self.signal = signal
+	local flow = SpinButton:new(name, text, action, value)
+	setmetatable(flow, FlowControlButton)
 	
-	return fb
-end
-
-function FlowControlButton:onClick()
-	self.action(value, direction, signal)
+	function flow:onClick()
+		flow.action(value, direction, signal)
+	end
+	
+	flow.direction = direction
+	flow.signal = signal
+	
+	return flow
+	
 end

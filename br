@@ -1,0 +1,242 @@
+-- Constants
+
+BROADCAST_PROTOCOL = "BRB"
+CONNECTION_PROTOCOL = "BRC"
+MESSAGE_PROTOCOL = "BRM"
+DATA_PROTOCOL = "BRD"
+CONNECTION_REQUEST = "REQ"
+WIRELESS_MODEM_SIDE = "back"
+
+-- Client Base Class
+
+Client = {
+	ID = -1,
+	position = {},
+	connectedServerID = -1,
+	availableServers = {},
+	notAvailableServers = {},
+	receiveDataHandler = nil,
+	messageHandler = nil,
+	monitor = nil,
+	monitorButtons = {},
+	modem = nil
+}
+
+function Client:new()
+
+	self.__index = self
+	
+	local client = {}
+	setmetatable(client, Client)
+	
+	function client:setDataHandler(data_handler)
+		client.receiveDataHandler = data_handler
+	end	
+	function client:setMessageHandler(msg_handler)
+		client.messageHandler = msg_handler
+	end	
+	function client:setButtons(mon_buttons)
+		client.monitorButtons = mon_buttons
+	end
+	
+	function client:removeFromAvailableServers(server_id)
+		local index = utils.contains(client.availableServers, server_id)
+		if index >= 0 then
+			table.remove(client.availableServers, index)
+		end
+	end
+	
+	function client:handleConnectionResponse(server_id, message)
+		if client.connectedServerID < 0 then
+			if message == true then
+				client.connectedServerID = server_id
+				client.availableServers = {}
+				print("Connected to server ("..server_id..").")
+				return
+			else
+				print("Connection to server ("..server_id..") was rejected.")
+			end
+		else
+			print("Failed to establish connection with server ("..server_id.."). Reason: a connection with other server already exist.")
+		end
+		client:removeFromAvailableServers(server_id)
+		table.insert(client.notAvailableServers, server_id)
+	end	
+	function client:handleReceivedData(received_data)
+		if not utils.isArray(received_data) then
+			print("Data received is not an array")
+			return
+		end
+		--[[
+		if not #received_data == #dataItems then
+			print("Data array received does not match the length of data items. Expected: "..#dataItems.." Found: "..#received_data)
+			return
+		end
+		]]--
+		
+		client.receiveDataHandler(received_data)
+	end
+	function client:handleMessage(message)	
+		client.messageHandler(message)
+	end
+	
+	function client:touchAsync()
+		while true do
+			local event, peripheral_name, c, r = os.pullEvent("monitor_touch")
+			local clicked = buttons.getClicked(client.monitorButtons, c, r)
+			if (clicked ~= nil) then
+				clicked:onClick()
+			end
+			sleep(0.25)
+		end
+	end
+	function client:receiveMessageAsync()
+		while true do
+			local sender, message, protocol = rednet.receive()
+			if message ~= nil then
+				if protocol == CONNECTION_PROTOCOL then
+					print("Connection response received")
+					client:handleConnectionResponse(sender, message)
+				elseif protocol == DATA_PROTOCOL then
+					client:handleReceivedData(message)
+				elseif protocol == MESSAGE_PROTOCOL then
+					client:handleMessage(message)
+				elseif client.connectedServerID < 0 and protocol == BROADCAST_PROTOCOL then
+					if utils.contains(client.notAvailableServers, sender) < 0 then
+						table.insert(client.availableServers, sender)
+						rednet.send(sender, CONNECTION_REQUEST, CONNECTION_PROTOCOL)
+						print("Sent connection request to server ("..sender..")")
+					end
+				end
+			end
+		end
+	end
+	
+	function client:startClient()
+		client.ID = os.getComputerID()
+		client.position = gps.getPosition()
+		client.monitor = peripheral.waitForConnection("monitor")
+		
+		client.modem = peripheral.waitForConnection("modem", function(name, object) return object.isWireless() end)
+		client.modem.open(1)
+		rednet.open(WIRELESS_MODEM_SIDE)
+		
+		rednet.host(client.position, CONNECTION_PROTOCOL)
+		rednet.host(client.position, MESSAGE_PROTOCOL)
+		rednet.host(client.position, DATA_PROTOCOL)
+		rednet.host(client.position, BROADCAST_PROTOCOL)
+		client.monitor.clear()
+		
+		for _, b in pairs(client.monitorButtons) do 
+			b:display(client.monitor)
+		end
+		
+		parallel.waitForAll(function() client:touchAsync() end, function() client:receiveMessageAsync() end)
+	end	
+	
+	return client
+	
+end
+
+-- Server Base Class
+
+Server = {
+	ID = -1,
+	connectedClientID = -1,
+	position = {},
+	dataFetcher = nil,
+	messageHandlers = {},
+	modem = nil
+}
+
+function Server:new()
+
+	self.__index = self
+	
+	local server = {}
+	setmetatable(server, Server)
+
+	function server:setDataFetcher(data_fetcher)
+		server.dataFetcher = data_fetcher
+	end
+	function server:setMessageHandlers(msg_handlers)
+		server.messageHandlers = msg_handlers
+	end
+	
+	function server:handleConnectionRequest(client_id)
+		if server.connectedClientID < 0 then 
+			--no current connections, establish one
+			server.connectedClientID = client_id
+			rednet.send(client_id, true, CONNECTION_PROTOCOL)
+			rednet.send(client_id, { ["position"] = server.position }, MESSAGE_PROTOCOL)
+			print("Client ("..server.connectedClientID..") connected.")
+			return
+		end
+		
+		--has existing, reject
+		rednet.send(client_id, false, CONNECTION_PROTOCOL)
+		print("Rejected connection request from client ("..client_id.."). Reason: a connection with another client already exists.")	
+	end
+	
+	function server:updateAsync()
+		while true do
+			if server.connectedClientID >= 0 then
+				rednet.send(server.connectedClientID, server:dataFetcher(), DATA_PROTOCOL)
+			end
+			sleep(0.25)
+		end
+	end	
+	function server:receiveMessageAsync()
+		local sender, message, protocol
+		while true do
+			print("Awaiting messages...")
+			sender, message, protocol = rednet.receive()
+			if message == nil then
+				return
+			end
+			if message == CONNECTION_REQUEST and protocol == CONNECTION_PROTOCOL then
+				print("Connection request received")
+				server:handleConnectionRequest(sender)
+			elseif protocol == MESSAGE_PROTOCOL then
+				for name, handler in pairs(server.messageHandlers) do
+					if message == name then
+						handler()
+					end
+				end
+			end
+		end
+	end	
+	function server:broadcastAsync()
+		while server.connectedClientID < 0 do
+			rednet.broadcast(server.position, BROADCAST_PROTOCOL)
+			sleep(1)
+		end
+	end
+	
+	function server:startServer()
+		server.ID = os.getComputerID()
+		server.position = gps.getPosition()
+
+		server.modem = peripheral.waitForConnection("modem", function(name, object) return object.isWireless() end)
+		server.modem.open(1)
+		rednet.open(WIRELESS_MODEM_SIDE)
+		
+		rednet.host(server.position, CONNECTION_PROTOCOL)
+		rednet.host(server.position, MESSAGE_PROTOCOL)
+		rednet.host(server.position, DATA_PROTOCOL)
+		rednet.host(server.position, BROADCAST_PROTOCOL)
+		
+		print("Server started")
+		parallel.waitForAll(function() server:updateAsync() end, function() server:receiveMessageAsync() end, function() server:broadcastAsync() end)
+	end	
+	
+	return server
+	
+end
+
+
+
+
+
+	
+
